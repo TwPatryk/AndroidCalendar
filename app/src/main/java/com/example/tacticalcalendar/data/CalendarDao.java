@@ -28,4 +28,10 @@ public interface CalendarDao {
     
     @Query("SELECT * FROM calendar_entries WHERE id = :id")
     CalendarEntry getEntryById(int id);
+
+    @Query("SELECT * FROM calendar_entries WHERE hasAlarm = 1 AND alarmTime > :currentTime")
+    List<CalendarEntry> getEntriesWithAlarmsSync(long currentTime);
+    
+    @Query("SELECT DISTINCT date FROM calendar_entries")
+    LiveData<List<Long>> getDatesWithEntries();
 }

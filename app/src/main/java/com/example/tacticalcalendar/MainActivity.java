@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.app.AlertDialog;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -38,9 +39,15 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class MainActivity extends AppCompatActivity {
+import android.Manifest;
+import android.content.pm.PackageManager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
+public class MainActivity extends AppCompatActivity {
     private CalendarView calendarView;
+    private static final int PERMISSION_REQUEST_CODE = 123;
+
     private RecyclerView recyclerView;
     private CalendarAdapter adapter;
     private CalendarDao calendarDao;
@@ -56,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        checkPermissions();
         calendarDao = AppDatabase.getDatabase(this).calendarDao();
 
         calendarView = findViewById(R.id.calendarView);
@@ -94,6 +102,14 @@ public class MainActivity extends AppCompatActivity {
             activeTags.clear();
             updateFilters();
         });
+    }
+
+    private void checkPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, PERMISSION_REQUEST_CODE);
+            }
+        }
     }
 
     private long normalizeDate(long time) {
