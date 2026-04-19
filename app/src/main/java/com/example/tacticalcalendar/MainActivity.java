@@ -65,8 +65,13 @@ import android.graphics.RectF;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.core.view.GravityCompat;
+import androidx.appcompat.app.ActionBarDrawerToggle;
+
 public class MainActivity extends AppCompatActivity {
     private MaterialCalendarView calendarView;
+    private DrawerLayout drawerLayout;
     private static final int PERMISSION_REQUEST_CODE = 123;
 
     private RecyclerView recyclerView;
@@ -76,8 +81,10 @@ public class MainActivity extends AppCompatActivity {
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
     private List<CalendarEntry> currentDayEntries = new ArrayList<>();
     private Set<String> activeTags = new HashSet<>();
+    private Set<String> allAvailableTags = new HashSet<>();
     private ChipGroup tagChipGroup;
     private long alarmTimeTemp = 0;
+    private boolean isFirstTagLoad = true;
 
     // UI Colors
     private int colorBackground = Color.WHITE;
@@ -97,6 +104,12 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+        drawerLayout = findViewById(R.id.drawerLayout);
+        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
+                this, drawerLayout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
+        // Move the icon to the right side
+        toolbar.setNavigationOnClickListener(v -> drawerLayout.openDrawer(GravityCompat.END));
+        
         checkPermissions();
         calendarDao = AppDatabase.getDatabase(this).calendarDao();
 
@@ -139,7 +152,12 @@ public class MainActivity extends AppCompatActivity {
         
         findViewById(R.id.chipShowAll).setOnClickListener(v -> {
             activeTags.clear();
+            activeTags.addAll(allAvailableTags);
+            // Wyjątek: niepilne wciąż ukryte przy show all? 
+            // Zwykle show all pokazuje wszystko, więc dodajemy też niepilne.
             updateFilters();
+            applyFilters();
+            observeAllEntriesForDecorators(); // Odśwież kropki
         });
     }
 
@@ -192,7 +210,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateCalendarDecorators() {
         calendarView.removeDecorators();
-        calendarView.addDecorator(new RectangleSelectDecorator(colorSelection));
         observeAllEntriesForDecorators(); // Refresh dots too
     }
 
@@ -206,6 +223,9 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.action_settings) {
             showSettingsDialog();
+            return true;
+        } else if (item.getItemId() == R.id.action_tags) {
+            drawerLayout.openDrawer(GravityCompat.END);
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -304,48 +324,27 @@ public class MainActivity extends AppCompatActivity {
         void onColorPicked(int color);
     }
 
-    private class RectangleSelectDecorator implements DayViewDecorator {
-        private final int color;
-
-        public RectangleSelectDecorator(int color) {
-            this.color = color;
-        }
-
-        @Override
-        public boolean shouldDecorate(CalendarDay day) {
-            return day.equals(calendarView.getSelectedDate());
-        }
-
-        @Override
-        public void decorate(DayViewFacade view) {
-            view.addSpan(new RectangleSpan(color));
-        }
-    }
-
-    private static class RectangleSpan implements LineBackgroundSpan {
-        private final int color;
-
-        public RectangleSpan(int color) {
-            this.color = color;
-        }
-
-        @Override
-        public void drawBackground(Canvas canvas, Paint paint, int left, int right, int top, int edit, int bottom, CharSequence text, int start, int end, int lnum) {
-            int oldColor = paint.getColor();
-            paint.setColor(color);
-            // Draw a rounded rectangle for a modern look, or just canvas.drawRect for sharp edges
-            canvas.drawRoundRect(new RectF(left, top, right, bottom), 8, 8, paint);
-            paint.setColor(oldColor);
-        }
-    }
-
     private void observeAllEntriesForDecorators() {
         calendarDao.getAllEntries().observe(this, entries -> {
             calendarView.removeDecorators();
             
-            // Map dates to list of colors
             java.util.Map<CalendarDay, java.util.List<Integer>> dateColors = new java.util.HashMap<>();
             for (CalendarEntry entry : entries) {
+                // Filtrowanie wpisów dla dekoratorów (kropek)
+                boolean matchesFilter = false;
+                if (entry.tags == null || entry.tags.isEmpty()) {
+                    matchesFilter = activeTags.isEmpty() || activeTags.size() == allAvailableTags.size(); 
+                } else {
+                    for (String t : entry.tags.split(",")) {
+                        if (activeTags.contains(t.trim())) {
+                            matchesFilter = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!matchesFilter) continue;
+
                 Calendar cal = Calendar.getInstance();
                 cal.setTimeInMillis(entry.date);
                 CalendarDay day = CalendarDay.from(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH));
@@ -359,8 +358,6 @@ public class MainActivity extends AppCompatActivity {
             for (java.util.Map.Entry<CalendarDay, java.util.List<Integer>> entry : dateColors.entrySet()) {
                 calendarView.addDecorator(new EventDecorator(entry.getValue(), entry.getKey()));
             }
-            
-            // Force refresh decorators
             calendarView.invalidateDecorators();
         });
     }
@@ -448,15 +445,21 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             }
+            
+            if (isFirstTagLoad) {
+                allAvailableTags = new HashSet<>(allTags);
+                activeTags = new HashSet<>(allTags);
+                activeTags.remove("niepilne"); // Domyślnie ukrywamy 'niepilne'
+                isFirstTagLoad = false;
+                applyFilters();
+                observeAllEntriesForDecorators();
+            }
             updateTagChips(allTags);
         });
     }
 
     private void updateTagChips(Set<String> tags) {
-        // Keep the "Show All" chip
-        View showAll = findViewById(R.id.chipShowAll);
         tagChipGroup.removeAllViews();
-        tagChipGroup.addView(showAll);
 
         for (String tag : tags) {
             Chip chip = new Chip(this);
@@ -467,6 +470,7 @@ public class MainActivity extends AppCompatActivity {
                 if (isChecked) activeTags.add(tag);
                 else activeTags.remove(tag);
                 applyFilters();
+                observeAllEntriesForDecorators(); // Ważne: odśwież kropki przy zmianie filtra
             });
             tagChipGroup.addView(chip);
         }
