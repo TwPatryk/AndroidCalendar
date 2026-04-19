@@ -82,7 +82,8 @@ public class MainActivity extends AppCompatActivity {
     // UI Colors
     private int colorBackground = Color.WHITE;
     private int colorFab = Color.BLUE;
-    private int colorSelection = Color.parseColor("#440000FF"); // Default semi-transparent blue
+    private int colorSelection = Color.parseColor("#440000FF");
+    private int colorToolbar = Color.parseColor("#6200EE");
     private SharedPreferences prefs;
 
     @Override
@@ -144,12 +145,33 @@ public class MainActivity extends AppCompatActivity {
 
     private void loadUserColors() {
         colorBackground = prefs.getInt("color_bg", Color.WHITE);
-        colorFab = prefs.getInt("color_fab", Color.parseColor("#6200EE")); // Default Material Purple
+        colorFab = prefs.getInt("color_fab", Color.parseColor("#6200EE"));
         colorSelection = prefs.getInt("color_selection", Color.parseColor("#446200EE"));
+        colorToolbar = prefs.getInt("color_toolbar", Color.parseColor("#6200EE"));
     }
 
     private void applyUiColors() {
         findViewById(R.id.main).setBackgroundColor(colorBackground);
+        
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            toolbar.setBackgroundColor(colorToolbar);
+        }
+
+        // Status Bar Color (matched with FAB as requested)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            getWindow().setStatusBarColor(colorFab);
+            
+            // Adjust status bar icons brightness based on background
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                View decor = getWindow().getDecorView();
+                if (isColorLight(colorFab)) {
+                    decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+                } else {
+                    decor.setSystemUiVisibility(0);
+                }
+            }
+        }
         
         FloatingActionButton fabAdd = findViewById(R.id.fabAddEntry);
         View fabToday = findViewById(R.id.fabToday);
@@ -161,6 +183,11 @@ public class MainActivity extends AppCompatActivity {
 
         calendarView.setSelectionColor(colorSelection);
         updateCalendarDecorators();
+    }
+
+    private boolean isColorLight(int color) {
+        double darkness = 1 - (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255;
+        return darkness < 0.5;
     }
 
     private void updateCalendarDecorators() {
@@ -192,10 +219,12 @@ public class MainActivity extends AppCompatActivity {
         View vBg = view.findViewById(R.id.viewBgPreview);
         View vFab = view.findViewById(R.id.viewFabPreview);
         View vSel = view.findViewById(R.id.viewSelectionPreview);
+        View vTool = view.findViewById(R.id.viewToolbarPreview);
 
         vBg.setBackgroundColor(colorBackground);
         vFab.setBackgroundColor(colorFab);
         vSel.setBackgroundColor(colorSelection);
+        vTool.setBackgroundColor(colorToolbar);
 
         view.findViewById(R.id.btnPickBgColor).setOnClickListener(v -> pickColor(c -> {
             colorBackground = c;
@@ -208,15 +237,21 @@ public class MainActivity extends AppCompatActivity {
         }, colorFab));
 
         view.findViewById(R.id.btnPickSelectionColor).setOnClickListener(v -> pickColor(c -> {
-            colorSelection = Color.argb(100, Color.red(c), Color.green(c), Color.blue(c)); // Auto-transparency
+            colorSelection = Color.argb(100, Color.red(c), Color.green(c), Color.blue(c));
             vSel.setBackgroundColor(colorSelection);
         }, colorSelection));
+
+        view.findViewById(R.id.btnPickToolbarColor).setOnClickListener(v -> pickColor(c -> {
+            colorToolbar = c;
+            vTool.setBackgroundColor(c);
+        }, colorToolbar));
 
         builder.setPositiveButton("Save", (d, w) -> {
             prefs.edit()
                 .putInt("color_bg", colorBackground)
                 .putInt("color_fab", colorFab)
                 .putInt("color_selection", colorSelection)
+                .putInt("color_toolbar", colorToolbar)
                 .apply();
             applyUiColors();
         });
