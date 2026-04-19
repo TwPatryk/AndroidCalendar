@@ -14,6 +14,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.RadioGroup;
+import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -259,6 +261,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private int dialogSelectedColor = Color.WHITE;
+    private int dialogOpacity = 255;
 
     private void showEntryDialog(CalendarEntry entryToEdit) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -270,7 +273,8 @@ public class MainActivity extends AppCompatActivity {
         EditText etTags = view.findViewById(R.id.etTags);
         RadioGroup rgColors = view.findViewById(R.id.rgColors);
         View viewSelectedColor = view.findViewById(R.id.viewSelectedColor);
-        viewSelectedColor.setVisibility(View.VISIBLE);
+        SeekBar sbOpacity = view.findViewById(R.id.sbOpacity);
+        TextView tvOpacityLabel = view.findViewById(R.id.tvOpacityLabel);
 
         if (entryToEdit != null) {
             etTitle.setText(entryToEdit.title);
@@ -278,31 +282,49 @@ public class MainActivity extends AppCompatActivity {
             etTags.setText(entryToEdit.tags);
             alarmTimeTemp = entryToEdit.alarmTime;
             dialogSelectedColor = entryToEdit.color;
+            dialogOpacity = Color.alpha(dialogSelectedColor);
         } else {
             alarmTimeTemp = 0;
             dialogSelectedColor = Color.WHITE;
+            dialogOpacity = 255;
         }
-        viewSelectedColor.setBackgroundColor(dialogSelectedColor);
+        
+        updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity);
 
         rgColors.setOnCheckedChangeListener((group, checkedId) -> {
             if (checkedId == R.id.rbRed) dialogSelectedColor = Color.parseColor("#FFCDD2");
             else if (checkedId == R.id.rbBlue) dialogSelectedColor = Color.parseColor("#BBDEFB");
             else if (checkedId == R.id.rbGreen) dialogSelectedColor = Color.parseColor("#C8E6C9");
             else if (checkedId == R.id.rbYellow) dialogSelectedColor = Color.parseColor("#FFF9C4");
-            viewSelectedColor.setBackgroundColor(dialogSelectedColor);
+            
+            // Preserve current opacity when picking preset
+            dialogSelectedColor = Color.argb(dialogOpacity, Color.red(dialogSelectedColor), Color.green(dialogSelectedColor), Color.blue(dialogSelectedColor));
+            updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity);
+        });
+
+        sbOpacity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                dialogOpacity = progress;
+                dialogSelectedColor = Color.argb(dialogOpacity, Color.red(dialogSelectedColor), Color.green(dialogSelectedColor), Color.blue(dialogSelectedColor));
+                updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity);
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
         view.findViewById(R.id.btnCustomColor).setOnClickListener(v -> {
-            // Simple Custom Color Picker (Input Hex or predefined list)
             final EditText input = new EditText(this);
-            input.setHint("#RRGGBB");
+            input.setHint("#RRGGBB or #AARRGGBB");
             new AlertDialog.Builder(this)
                 .setTitle("Enter Hex Color")
                 .setView(input)
                 .setPositiveButton("OK", (d, w) -> {
                     try {
-                        dialogSelectedColor = Color.parseColor(input.getText().toString());
-                        viewSelectedColor.setBackgroundColor(dialogSelectedColor);
+                        int color = Color.parseColor(input.getText().toString());
+                        dialogSelectedColor = color;
+                        dialogOpacity = Color.alpha(color);
+                        updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity);
                         rgColors.clearCheck();
                     } catch (Exception e) {
                         Toast.makeText(this, "Invalid color format", Toast.LENGTH_SHORT).show();
@@ -382,6 +404,13 @@ public class MainActivity extends AppCompatActivity {
         }
 
         builder.show();
+    }
+
+    private void updateColorPreview(View preview, TextView label, SeekBar seekBar) {
+        preview.setBackgroundColor(dialogSelectedColor);
+        int percent = (int) ((dialogOpacity / 255.0) * 100);
+        label.setText("Opacity: " + percent + "%");
+        seekBar.setProgress(dialogOpacity);
     }
 
     private void cancelAlarm(int entryId) {

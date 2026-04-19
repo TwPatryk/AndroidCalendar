@@ -48,7 +48,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Choose Color"
+            android:text="Choose Entry Color &amp; Opacity"
             android:layout_marginTop="16dp"/>
 
         <HorizontalScrollView
@@ -60,29 +60,51 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
-                <!-- Color radio buttons with better styling -->
-                <RadioButton android:id="@+id/rbRed" android:layout_width="48dp" android:layout_height="48dp" android:background="@android:color/holo_red_light" android:button="@android:drawable/btn_radio" android:layout_margin="4dp"/>
-                <RadioButton android:id="@+id/rbBlue" android:layout_width="48dp" android:layout_height="48dp" android:background="@android:color/holo_blue_light" android:button="@android:drawable/btn_radio" android:layout_margin="4dp"/>
-                <RadioButton android:id="@+id/rbGreen" android:layout_width="48dp" android:layout_height="48dp" android:background="@android:color/holo_green_light" android:button="@android:drawable/btn_radio" android:layout_margin="4dp"/>
-                <RadioButton android:id="@+id/rbYellow" android:layout_width="48dp" android:layout_height="48dp" android:background="@android:color/holo_orange_light" android:button="@android:drawable/btn_radio" android:layout_margin="4dp"/>
+                <!-- Color radio buttons -->
+                <RadioButton android:id="@+id/rbRed" android:layout_width="48dp" android:layout_height="48dp" android:background="#FFCDD2" android:button="@null" android:layout_margin="4dp"/>
+                <RadioButton android:id="@+id/rbBlue" android:layout_width="48dp" android:layout_height="48dp" android:background="#BBDEFB" android:button="@null" android:layout_margin="4dp"/>
+                <RadioButton android:id="@+id/rbGreen" android:layout_width="48dp" android:layout_height="48dp" android:background="#C8E6C9" android:button="@null" android:layout_margin="4dp"/>
+                <RadioButton android:id="@+id/rbYellow" android:layout_width="48dp" android:layout_height="48dp" android:background="#FFF9C4" android:button="@null" android:layout_margin="4dp"/>
             </RadioGroup>
         </HorizontalScrollView>
 
-        <Button
-            android:id="@+id/btnCustomColor"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Choose Custom Color"
-            android:layout_marginTop="8dp"
-            style="@style/Widget.MaterialComponents.Button.TextButton"/>
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
 
-        <View
-            android:id="@+id/viewSelectedColor"
+            <Button
+                android:id="@+id/btnCustomColor"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Custom Color"
+                style="@style/Widget.MaterialComponents.Button.TextButton"/>
+
+            <View
+                android:id="@+id/viewSelectedColor"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="8dp"
+                android:background="#FFFFFF"
+                android:elevation="2dp"/>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvOpacityLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Opacity: 100%"
+            android:layout_marginTop="8dp"/>
+
+        <SeekBar
+            android:id="@+id/sbOpacity"
             android:layout_width="match_parent"
-            android:layout_height="24dp"
-            android:layout_marginTop="4dp"
-            android:background="#FFFFFF"
-            android:visibility="gone"/>
+            android:layout_height="wrap_content"
+            android:max="255"
+            android:progress="255"/>
 
         <LinearLayout
             android:layout_width="match_parent"
