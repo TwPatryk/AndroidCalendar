@@ -52,6 +52,10 @@ import android.content.pm.PackageManager;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import android.text.style.LineBackgroundSpan;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+
 public class MainActivity extends AppCompatActivity {
     private MaterialCalendarView calendarView;
     private static final int PERMISSION_REQUEST_CODE = 123;
@@ -160,10 +164,35 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void decorate(DayViewFacade view) {
-            // Increased dot radius from 8 to 12 for better visibility
             if (!colors.isEmpty()) {
-                view.addSpan(new DotSpan(12, colors.get(0)));
+                view.addSpan(new MultiDotSpan(colors));
             }
+        }
+    }
+
+    private static class MultiDotSpan implements LineBackgroundSpan {
+        private final List<Integer> colors;
+        private static final float DOT_RADIUS = 6f; // Smaller dots
+        private static final float SPACING = 4f;
+
+        public MultiDotSpan(List<Integer> colors) {
+            this.colors = colors;
+        }
+
+        @Override
+        public void drawBackground(Canvas canvas, Paint paint, int left, int right, int top, int edit, int bottom, CharSequence text, int start, int end, int lnum) {
+            int total = Math.min(colors.size(), 5); // Max 5 dots to keep it clean
+            int oldColor = paint.getColor();
+            
+            float centerX = (left + right) / 2f;
+            float startX = centerX - ((total - 1) * (DOT_RADIUS + SPACING) / 2f);
+
+            for (int i = 0; i < total; i++) {
+                paint.setColor(colors.get(i));
+                canvas.drawCircle(startX + i * (DOT_RADIUS * 2 + SPACING), bottom + DOT_RADIUS + 2, DOT_RADIUS, paint);
+            }
+            
+            paint.setColor(oldColor);
         }
     }
 
@@ -366,6 +395,13 @@ public class MainActivity extends AppCompatActivity {
         });
 
         builder.setPositiveButton("Save", (dialog, which) -> {
+            // Hide keyboard
+            View currentFocus = ((AlertDialog)dialog).getCurrentFocus();
+            if (currentFocus != null) {
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(currentFocus.getWindowToken(), 0);
+            }
+
             String title = etTitle.getText().toString();
             String desc = etDescription.getText().toString();
             String tags = etTags.getText().toString();
