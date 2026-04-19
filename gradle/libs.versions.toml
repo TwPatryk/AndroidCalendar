@@ -9,6 +9,7 @@ activity = "1.13.0"
 constraintlayout = "2.2.1"
 room = "2.6.1"
 lifecycle = "2.8.7"
+materialCalendarView = "2.0.1"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -23,6 +24,7 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
 lifecycle-livedata = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version.ref = "lifecycle" }
+material-calendarview = { group = "com.github.prolificinteractive", name = "material-calendarview", version.ref = "materialCalendarView" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

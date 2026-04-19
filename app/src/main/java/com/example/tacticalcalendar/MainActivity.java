@@ -12,13 +12,13 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.CalendarView;
 import android.widget.EditText;
-import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import androidx.lifecycle.LiveData;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -30,6 +30,12 @@ import com.example.tacticalcalendar.receiver.AlarmReceiver;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.prolificinteractive.materialcalendarview.CalendarDay;
+import com.prolificinteractive.materialcalendarview.DayViewDecorator;
+import com.prolificinteractive.materialcalendarview.DayViewFacade;
+import com.prolificinteractive.materialcalendarview.MaterialCalendarView;
+import com.prolificinteractive.materialcalendarview.OnDateSelectedListener;
+import com.prolificinteractive.materialcalendarview.spans.DotSpan;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -45,7 +51,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 public class MainActivity extends AppCompatActivity {
-    private CalendarView calendarView;
+    private MaterialCalendarView calendarView;
     private static final int PERMISSION_REQUEST_CODE = 123;
 
     private RecyclerView recyclerView;
@@ -63,6 +69,9 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+
         checkPermissions();
         calendarDao = AppDatabase.getDatabase(this).calendarDao();
 
@@ -78,30 +87,80 @@ public class MainActivity extends AppCompatActivity {
 
         // Default to today
         selectedDate = normalizeDate(System.currentTimeMillis());
+        calendarView.setSelectedDate(CalendarDay.today());
 
-        calendarView.setOnDateChangeListener((view, year, month, dayOfMonth) -> {
-            Calendar selected = Calendar.getInstance();
-            selected.set(year, month, dayOfMonth, 0, 0, 0);
-            selected.set(Calendar.MILLISECOND, 0);
-            selectedDate = selected.getTimeInMillis();
+        calendarView.setOnDateChangedListener((widget, date, selected) -> {
+            Calendar cal = Calendar.getInstance();
+            cal.set(date.getYear(), date.getMonth() - 1, date.getDay(), 0, 0, 0);
+            cal.set(Calendar.MILLISECOND, 0);
+            selectedDate = cal.getTimeInMillis();
             loadEntriesForSelectedDate();
         });
 
         fabAdd.setOnClickListener(v -> showAddDialog());
         fabToday.setOnClickListener(v -> {
-            long today = System.currentTimeMillis();
-            calendarView.setDate(today);
-            selectedDate = normalizeDate(today);
+            CalendarDay today = CalendarDay.today();
+            calendarView.setSelectedDate(today);
+            calendarView.setCurrentDate(today);
+            selectedDate = normalizeDate(System.currentTimeMillis());
             loadEntriesForSelectedDate();
         });
 
         loadEntriesForSelectedDate();
         observeAllTags();
+        observeAllEntriesForDecorators();
         
         findViewById(R.id.chipShowAll).setOnClickListener(v -> {
             activeTags.clear();
             updateFilters();
         });
+    }
+
+    private void observeAllEntriesForDecorators() {
+        calendarDao.getAllEntries().observe(this, entries -> {
+            calendarView.removeDecorators();
+            
+            // Map dates to list of colors
+            java.util.Map<CalendarDay, java.util.List<Integer>> dateColors = new java.util.HashMap<>();
+            for (CalendarEntry entry : entries) {
+                Calendar cal = Calendar.getInstance();
+                cal.setTimeInMillis(entry.date);
+                CalendarDay day = CalendarDay.from(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH));
+                
+                if (!dateColors.containsKey(day)) {
+                    dateColors.put(day, new ArrayList<>());
+                }
+                dateColors.get(day).add(entry.color != 0 ? entry.color : Color.GRAY);
+            }
+
+            for (java.util.Map.Entry<CalendarDay, java.util.List<Integer>> entry : dateColors.entrySet()) {
+                calendarView.addDecorator(new EventDecorator(entry.getValue(), entry.getKey()));
+            }
+        });
+    }
+
+    private static class EventDecorator implements DayViewDecorator {
+        private final List<Integer> colors;
+        private final CalendarDay day;
+
+        public EventDecorator(List<Integer> colors, CalendarDay day) {
+            this.colors = colors;
+            this.day = day;
+        }
+
+        @Override
+        public boolean shouldDecorate(CalendarDay day) {
+            return this.day.equals(day);
+        }
+
+        @Override
+        public void decorate(DayViewFacade view) {
+            // MaterialCalendarView typically supports one dot via DotSpan
+            // For multiple colors, we'd need a custom Span, but let's start with the first color
+            if (!colors.isEmpty()) {
+                view.addSpan(new DotSpan(8, colors.get(0)));
+            }
+        }
     }
 
     private void checkPermissions() {
