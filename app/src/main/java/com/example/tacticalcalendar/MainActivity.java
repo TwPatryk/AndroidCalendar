@@ -289,18 +289,26 @@ public class MainActivity extends AppCompatActivity {
         SeekBar sbG = view.findViewById(R.id.sbGreen);
         SeekBar sbB = view.findViewById(R.id.sbBlue);
         SeekBar sbA = view.findViewById(R.id.sbAlpha);
+        SeekBar sbS = view.findViewById(R.id.sbSaturation);
 
         // Ustawienie początkowych wartości
         sbR.setProgress(Color.red(initialColor));
         sbG.setProgress(Color.green(initialColor));
         sbB.setProgress(Color.blue(initialColor));
         sbA.setProgress(Color.alpha(initialColor));
+        float[] initialHsv = new float[3];
+        Color.colorToHSV(initialColor, initialHsv);
+        sbS.setProgress((int)(initialHsv[1] * 100));
         vPreview.setBackgroundColor(initialColor);
 
         SeekBar.OnSeekBarChangeListener changeListener = new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                int color = Color.argb(sbA.getProgress(), sbR.getProgress(), sbG.getProgress(), sbB.getProgress());
+                int baseColor = Color.rgb(sbR.getProgress(), sbG.getProgress(), sbB.getProgress());
+                float[] hsv = new float[3];
+                Color.colorToHSV(baseColor, hsv);
+                hsv[1] = sbS.getProgress() / 100f;
+                int color = Color.HSVToColor(sbA.getProgress(), hsv);
                 vPreview.setBackgroundColor(color);
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
@@ -311,9 +319,14 @@ public class MainActivity extends AppCompatActivity {
         sbG.setOnSeekBarChangeListener(changeListener);
         sbB.setOnSeekBarChangeListener(changeListener);
         sbA.setOnSeekBarChangeListener(changeListener);
+        sbS.setOnSeekBarChangeListener(changeListener);
 
         builder.setPositiveButton("Wybierz", (d, w) -> {
-            int finalColor = Color.argb(sbA.getProgress(), sbR.getProgress(), sbG.getProgress(), sbB.getProgress());
+            int baseColor = Color.rgb(sbR.getProgress(), sbG.getProgress(), sbB.getProgress());
+            float[] hsv = new float[3];
+            Color.colorToHSV(baseColor, hsv);
+            hsv[1] = sbS.getProgress() / 100f;
+            int finalColor = Color.HSVToColor(sbA.getProgress(), hsv);
             listener.onColorPicked(finalColor);
         });
         builder.setNegativeButton("Anuluj", null);
@@ -514,6 +527,7 @@ public class MainActivity extends AppCompatActivity {
 
     private int dialogSelectedColor = Color.WHITE;
     private int dialogOpacity = 255;
+    private float dialogSaturation = 1.0f;
 
     private void showEntryDialog(CalendarEntry entryToEdit) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -527,6 +541,8 @@ public class MainActivity extends AppCompatActivity {
         View viewSelectedColor = view.findViewById(R.id.viewSelectedColor);
         SeekBar sbOpacity = view.findViewById(R.id.sbOpacity);
         TextView tvOpacityLabel = view.findViewById(R.id.tvOpacityLabel);
+        SeekBar sbSaturation = view.findViewById(R.id.sbSaturation);
+        TextView tvSaturationLabel = view.findViewById(R.id.tvSaturationLabel);
 
         if (entryToEdit != null) {
             etTitle.setText(entryToEdit.title);
@@ -535,31 +551,55 @@ public class MainActivity extends AppCompatActivity {
             alarmTimeTemp = entryToEdit.alarmTime;
             dialogSelectedColor = entryToEdit.color;
             dialogOpacity = Color.alpha(dialogSelectedColor);
+            float[] hsv = new float[3];
+            Color.colorToHSV(dialogSelectedColor, hsv);
+            dialogSaturation = hsv[1];
         } else {
             alarmTimeTemp = 0;
             dialogSelectedColor = Color.WHITE;
             dialogOpacity = 255;
+            dialogSaturation = 1.0f;
         }
         
-        updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity);
+        updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity, tvSaturationLabel, sbSaturation);
 
         rgColors.setOnCheckedChangeListener((group, checkedId) -> {
-            if (checkedId == R.id.rbRed) dialogSelectedColor = Color.parseColor("#FFCDD2");
-            else if (checkedId == R.id.rbBlue) dialogSelectedColor = Color.parseColor("#BBDEFB");
-            else if (checkedId == R.id.rbGreen) dialogSelectedColor = Color.parseColor("#C8E6C9");
-            else if (checkedId == R.id.rbYellow) dialogSelectedColor = Color.parseColor("#FFF9C4");
+            int baseColor;
+            if (checkedId == R.id.rbRed) baseColor = Color.parseColor("#FFCDD2");
+            else if (checkedId == R.id.rbBlue) baseColor = Color.parseColor("#BBDEFB");
+            else if (checkedId == R.id.rbGreen) baseColor = Color.parseColor("#C8E6C9");
+            else if (checkedId == R.id.rbYellow) baseColor = Color.parseColor("#FFF9C4");
+            else baseColor = Color.WHITE;
             
-            // Preserve current opacity when picking preset
-            dialogSelectedColor = Color.argb(dialogOpacity, Color.red(dialogSelectedColor), Color.green(dialogSelectedColor), Color.blue(dialogSelectedColor));
-            updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity);
+            float[] hsv = new float[3];
+            Color.colorToHSV(baseColor, hsv);
+            hsv[1] = dialogSaturation; // Keep current saturation
+            dialogSelectedColor = Color.HSVToColor(dialogOpacity, hsv);
+            updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity, tvSaturationLabel, sbSaturation);
         });
 
         sbOpacity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 dialogOpacity = progress;
-                dialogSelectedColor = Color.argb(dialogOpacity, Color.red(dialogSelectedColor), Color.green(dialogSelectedColor), Color.blue(dialogSelectedColor));
-                updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity);
+                float[] hsv = new float[3];
+                Color.colorToHSV(dialogSelectedColor, hsv);
+                dialogSelectedColor = Color.HSVToColor(dialogOpacity, hsv);
+                updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity, tvSaturationLabel, sbSaturation);
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        sbSaturation.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                dialogSaturation = progress / 100f;
+                float[] hsv = new float[3];
+                Color.colorToHSV(dialogSelectedColor, hsv);
+                hsv[1] = dialogSaturation;
+                dialogSelectedColor = Color.HSVToColor(dialogOpacity, hsv);
+                updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity, tvSaturationLabel, sbSaturation);
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
@@ -569,7 +609,7 @@ public class MainActivity extends AppCompatActivity {
             pickColor(color -> {
                 dialogSelectedColor = color;
                 dialogOpacity = Color.alpha(color);
-                updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity);
+                updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity, tvSaturationLabel, sbSaturation);
                 rgColors.clearCheck();
             }, dialogSelectedColor);
         });
@@ -670,11 +710,15 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
-    private void updateColorPreview(View preview, TextView label, SeekBar seekBar) {
+    private void updateColorPreview(View preview, TextView opLabel, SeekBar opSeekBar, TextView satLabel, SeekBar satSeekBar) {
         preview.setBackgroundColor(dialogSelectedColor);
-        int percent = (int) ((dialogOpacity / 255.0) * 100);
-        label.setText("Opacity: " + percent + "%");
-        seekBar.setProgress(dialogOpacity);
+        int opPercent = (int) ((dialogOpacity / 255.0) * 100);
+        opLabel.setText("Opacity: " + opPercent + "%");
+        opSeekBar.setProgress(dialogOpacity);
+        
+        int satPercent = (int) (dialogSaturation * 100);
+        satLabel.setText("Saturation: " + satPercent + "%");
+        satSeekBar.setProgress(satPercent);
     }
 
     private void cancelAlarm(int entryId) {

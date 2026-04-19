@@ -59,6 +59,19 @@
         android:max="255"
         android:layout_marginBottom="12dp"/>
 
+    <!-- Saturation -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Nasycenie (Saturation)"/>
+    <SeekBar
+        android:id="@+id/sbSaturation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="100"
+        android:progress="100"
+        android:layout_marginBottom="12dp"/>
+
     <!-- Alpha (Opacity) -->
     <TextView
         android:layout_width="wrap_content"

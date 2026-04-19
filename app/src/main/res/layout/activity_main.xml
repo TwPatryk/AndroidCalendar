@@ -52,6 +52,9 @@
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|end"
             android:layout_margin="16dp"
+            app:elevation="0dp"
+            app:pressedTranslationZ="0dp"
+            app:borderWidth="0dp"
             app:shapeAppearanceOverlay="@style/ShapeAppearance.RoundedSquare"
             app:srcCompat="@android:drawable/ic_input_add" />
 
@@ -62,6 +65,9 @@
             android:layout_gravity="bottom|start"
             android:layout_margin="16dp"
             android:text="Today"
+            app:elevation="0dp"
+            app:pressedTranslationZ="0dp"
+            app:borderWidth="0dp"
             app:shapeAppearanceOverlay="@style/ShapeAppearance.RoundedSquare"
             app:icon="@android:drawable/ic_menu_today" />
 

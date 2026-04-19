@@ -93,6 +93,20 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/tvSaturationLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Saturation: 100%"
+            android:layout_marginTop="8dp"/>
+
+        <SeekBar
+            android:id="@+id/sbSaturation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="100"/>
+
+        <TextView
             android:id="@+id/tvOpacityLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
