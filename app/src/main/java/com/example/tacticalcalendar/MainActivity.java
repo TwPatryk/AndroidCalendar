@@ -1,0 +1,275 @@
+package com.example.tacticalcalendar;
+
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.app.TimePickerDialog;
+import android.content.Context;
+import android.content.Intent;
+import android.app.AlertDialog;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.widget.CalendarView;
+import android.widget.EditText;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.LiveData;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.tacticalcalendar.data.AppDatabase;
+import com.example.tacticalcalendar.data.CalendarDao;
+import com.example.tacticalcalendar.data.CalendarEntry;
+import com.example.tacticalcalendar.receiver.AlarmReceiver;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class MainActivity extends AppCompatActivity {
+
+    private CalendarView calendarView;
+    private RecyclerView recyclerView;
+    private CalendarAdapter adapter;
+    private CalendarDao calendarDao;
+    private long selectedDate;
+    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+    private List<CalendarEntry> currentDayEntries = new ArrayList<>();
+    private Set<String> activeTags = new HashSet<>();
+    private ChipGroup tagChipGroup;
+    private long alarmTimeTemp = 0;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        calendarDao = AppDatabase.getDatabase(this).calendarDao();
+
+        calendarView = findViewById(R.id.calendarView);
+        recyclerView = findViewById(R.id.recyclerViewEntries);
+        tagChipGroup = findViewById(R.id.tagChipGroup);
+        FloatingActionButton fabAdd = findViewById(R.id.fabAddEntry);
+        View fabToday = findViewById(R.id.fabToday);
+
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        adapter = new CalendarAdapter(this::showEditDialog);
+        recyclerView.setAdapter(adapter);
+
+        // Default to today
+        selectedDate = normalizeDate(System.currentTimeMillis());
+
+        calendarView.setOnDateChangeListener((view, year, month, dayOfMonth) -> {
+            Calendar selected = Calendar.getInstance();
+            selected.set(year, month, dayOfMonth, 0, 0, 0);
+            selected.set(Calendar.MILLISECOND, 0);
+            selectedDate = selected.getTimeInMillis();
+            loadEntriesForSelectedDate();
+        });
+
+        fabAdd.setOnClickListener(v -> showAddDialog());
+        fabToday.setOnClickListener(v -> {
+            long today = System.currentTimeMillis();
+            calendarView.setDate(today);
+            selectedDate = normalizeDate(today);
+            loadEntriesForSelectedDate();
+        });
+
+        loadEntriesForSelectedDate();
+        observeAllTags();
+        
+        findViewById(R.id.chipShowAll).setOnClickListener(v -> {
+            activeTags.clear();
+            updateFilters();
+        });
+    }
+
+    private long normalizeDate(long time) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTimeInMillis(time);
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        return cal.getTimeInMillis();
+    }
+
+    private void loadEntriesForSelectedDate() {
+        calendarDao.getEntriesForDate(selectedDate).observe(this, entries -> {
+            currentDayEntries = entries;
+            applyFilters();
+        });
+    }
+
+    private void observeAllTags() {
+        calendarDao.getAllEntries().observe(this, entries -> {
+            Set<String> allTags = new HashSet<>();
+            for (CalendarEntry entry : entries) {
+                if (entry.tags != null && !entry.tags.isEmpty()) {
+                    for (String t : entry.tags.split(",")) {
+                        allTags.add(t.trim());
+                    }
+                }
+            }
+            updateTagChips(allTags);
+        });
+    }
+
+    private void updateTagChips(Set<String> tags) {
+        // Keep the "Show All" chip
+        View showAll = findViewById(R.id.chipShowAll);
+        tagChipGroup.removeAllViews();
+        tagChipGroup.addView(showAll);
+
+        for (String tag : tags) {
+            Chip chip = new Chip(this);
+            chip.setText(tag);
+            chip.setCheckable(true);
+            chip.setChecked(activeTags.contains(tag));
+            chip.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                if (isChecked) activeTags.add(tag);
+                else activeTags.remove(tag);
+                applyFilters();
+            });
+            tagChipGroup.addView(chip);
+        }
+    }
+
+    private void applyFilters() {
+        if (activeTags.isEmpty()) {
+            adapter.setEntries(currentDayEntries);
+        } else {
+            List<CalendarEntry> filtered = new ArrayList<>();
+            for (CalendarEntry entry : currentDayEntries) {
+                boolean match = false;
+                if (entry.tags != null) {
+                    for (String t : entry.tags.split(",")) {
+                        if (activeTags.contains(t.trim())) {
+                            match = true;
+                            break;
+                        }
+                    }
+                }
+                if (match) filtered.add(entry);
+            }
+            adapter.setEntries(filtered);
+        }
+    }
+    
+    private void updateFilters() {
+        for (int i = 1; i < tagChipGroup.getChildCount(); i++) {
+            ((Chip)tagChipGroup.getChildAt(i)).setChecked(false);
+        }
+        applyFilters();
+    }
+
+    private void showAddDialog() {
+        showEntryDialog(null);
+    }
+
+    private void showEditDialog(CalendarEntry entry) {
+        showEntryDialog(entry);
+    }
+
+    private void showEntryDialog(CalendarEntry entryToEdit) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_add_entry, null);
+        builder.setView(view);
+
+        EditText etTitle = view.findViewById(R.id.etTitle);
+        EditText etDescription = view.findViewById(R.id.etDescription);
+        EditText etTags = view.findViewById(R.id.etTags);
+        RadioGroup rgColors = view.findViewById(R.id.rgColors);
+
+        if (entryToEdit != null) {
+            etTitle.setText(entryToEdit.title);
+            etDescription.setText(entryToEdit.description);
+            etTags.setText(entryToEdit.tags);
+            alarmTimeTemp = entryToEdit.alarmTime;
+        } else {
+            alarmTimeTemp = 0;
+        }
+
+        view.findViewById(R.id.btnSetAlarm).setOnClickListener(v -> {
+            Calendar currentTime = Calendar.getInstance();
+            new TimePickerDialog(this, (view1, hourOfDay, minute) -> {
+                Calendar alarmCal = Calendar.getInstance();
+                alarmCal.setTimeInMillis(selectedDate);
+                alarmCal.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                alarmCal.set(Calendar.MINUTE, minute);
+                alarmTimeTemp = alarmCal.getTimeInMillis();
+                Toast.makeText(this, "Alarm set", Toast.LENGTH_SHORT).show();
+            }, currentTime.get(Calendar.HOUR_OF_DAY), currentTime.get(Calendar.SECOND), true).show();
+        });
+
+        builder.setPositiveButton("Save", (dialog, which) -> {
+            String title = etTitle.getText().toString();
+            String desc = etDescription.getText().toString();
+            String tags = etTags.getText().toString();
+            
+            int color = Color.WHITE;
+            int checkedId = rgColors.getCheckedRadioButtonId();
+            if (checkedId == R.id.rbRed) color = Color.parseColor("#FFCDD2");
+            else if (checkedId == R.id.rbBlue) color = Color.parseColor("#BBDEFB");
+            else if (checkedId == R.id.rbGreen) color = Color.parseColor("#C8E6C9");
+            else if (checkedId == R.id.rbYellow) color = Color.parseColor("#FFF9C4");
+
+            CalendarEntry entry = entryToEdit != null ? entryToEdit : new CalendarEntry();
+            entry.title = title;
+            entry.description = desc;
+            entry.tags = tags;
+            entry.date = selectedDate;
+            entry.color = color;
+            entry.alarmTime = alarmTimeTemp;
+            entry.hasAlarm = alarmTimeTemp > 0;
+
+            executorService.execute(() -> {
+                long id;
+                if (entryToEdit != null) {
+                    calendarDao.update(entry);
+                    id = entry.id;
+                } else {
+                    id = calendarDao.insert(entry);
+                }
+                
+                if (entry.hasAlarm) {
+                    scheduleAlarm((int)id, entry.title, entry.alarmTime);
+                }
+            });
+        });
+
+        builder.setNegativeButton("Cancel", null);
+        if (entryToEdit != null) {
+            builder.setNeutralButton("Delete", (dialog, which) -> {
+                executorService.execute(() -> calendarDao.delete(entryToEdit));
+            });
+        }
+
+        builder.show();
+    }
+
+    private void scheduleAlarm(int entryId, String title, long timeInMillis) {
+        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        Intent intent = new Intent(this, AlarmReceiver.class);
+        intent.putExtra(AlarmReceiver.EXTRA_ENTRY_ID, entryId);
+        intent.putExtra("title", title);
+        
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, entryId, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        
+        if (timeInMillis > System.currentTimeMillis()) {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timeInMillis, pendingIntent);
+        }
+    }
+}
