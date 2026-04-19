@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Personalizacja UI"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- Tło -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Kolor tła głównego"/>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <View
+                android:id="@+id/viewBgPreview"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="#FFFFFF"
+                android:elevation="2dp"/>
+            <Button
+                android:id="@+id/btnPickBgColor"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Zmień"/>
+        </LinearLayout>
+
+        <!-- Przyciski -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Kolor przycisków (Today &amp; +)"/>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <View
+                android:id="@+id/viewFabPreview"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="#FFFFFF"
+                android:elevation="2dp"/>
+            <Button
+                android:id="@+id/btnPickFabColor"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Zmień"/>
+        </LinearLayout>
+
+        <!-- Zaznaczenie -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Kolor zaznaczenia dnia"/>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <View
+                android:id="@+id/viewSelectionPreview"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="#FFFFFF"
+                android:elevation="2dp"/>
+            <Button
+                android:id="@+id/btnPickSelectionColor"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Zmień"/>
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

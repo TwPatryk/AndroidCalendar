@@ -60,6 +60,11 @@ import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 
+import android.content.SharedPreferences;
+import android.graphics.RectF;
+import android.view.Menu;
+import android.view.MenuItem;
+
 public class MainActivity extends AppCompatActivity {
     private MaterialCalendarView calendarView;
     private static final int PERMISSION_REQUEST_CODE = 123;
@@ -74,10 +79,19 @@ public class MainActivity extends AppCompatActivity {
     private ChipGroup tagChipGroup;
     private long alarmTimeTemp = 0;
 
+    // UI Colors
+    private int colorBackground = Color.WHITE;
+    private int colorFab = Color.BLUE;
+    private int colorSelection = Color.parseColor("#440000FF"); // Default semi-transparent blue
+    private SharedPreferences prefs;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+        loadUserColors();
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -90,6 +104,8 @@ public class MainActivity extends AppCompatActivity {
         tagChipGroup = findViewById(R.id.tagChipGroup);
         FloatingActionButton fabAdd = findViewById(R.id.fabAddEntry);
         View fabToday = findViewById(R.id.fabToday);
+
+        applyUiColors();
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new CalendarAdapter(this::showEditDialog);
@@ -124,6 +140,165 @@ public class MainActivity extends AppCompatActivity {
             activeTags.clear();
             updateFilters();
         });
+    }
+
+    private void loadUserColors() {
+        colorBackground = prefs.getInt("color_bg", Color.WHITE);
+        colorFab = prefs.getInt("color_fab", Color.parseColor("#6200EE")); // Default Material Purple
+        colorSelection = prefs.getInt("color_selection", Color.parseColor("#446200EE"));
+    }
+
+    private void applyUiColors() {
+        findViewById(R.id.main).setBackgroundColor(colorBackground);
+        
+        FloatingActionButton fabAdd = findViewById(R.id.fabAddEntry);
+        View fabToday = findViewById(R.id.fabToday);
+        
+        fabAdd.setBackgroundTintList(android.content.res.ColorStateList.valueOf(colorFab));
+        if (fabToday instanceof com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton) {
+            ((com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton)fabToday).setBackgroundTintList(android.content.res.ColorStateList.valueOf(colorFab));
+        }
+
+        calendarView.setSelectionColor(colorSelection);
+        updateCalendarDecorators();
+    }
+
+    private void updateCalendarDecorators() {
+        calendarView.removeDecorators();
+        calendarView.addDecorator(new RectangleSelectDecorator(colorSelection));
+        observeAllEntriesForDecorators(); // Refresh dots too
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.action_settings) {
+            showSettingsDialog();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void showSettingsDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_settings, null);
+        builder.setView(view);
+
+        View vBg = view.findViewById(R.id.viewBgPreview);
+        View vFab = view.findViewById(R.id.viewFabPreview);
+        View vSel = view.findViewById(R.id.viewSelectionPreview);
+
+        vBg.setBackgroundColor(colorBackground);
+        vFab.setBackgroundColor(colorFab);
+        vSel.setBackgroundColor(colorSelection);
+
+        view.findViewById(R.id.btnPickBgColor).setOnClickListener(v -> pickColor(c -> {
+            colorBackground = c;
+            vBg.setBackgroundColor(c);
+        }, colorBackground));
+
+        view.findViewById(R.id.btnPickFabColor).setOnClickListener(v -> pickColor(c -> {
+            colorFab = c;
+            vFab.setBackgroundColor(c);
+        }, colorFab));
+
+        view.findViewById(R.id.btnPickSelectionColor).setOnClickListener(v -> pickColor(c -> {
+            colorSelection = Color.argb(100, Color.red(c), Color.green(c), Color.blue(c)); // Auto-transparency
+            vSel.setBackgroundColor(colorSelection);
+        }, colorSelection));
+
+        builder.setPositiveButton("Save", (d, w) -> {
+            prefs.edit()
+                .putInt("color_bg", colorBackground)
+                .putInt("color_fab", colorFab)
+                .putInt("color_selection", colorSelection)
+                .apply();
+            applyUiColors();
+        });
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
+    }
+
+    private void pickColor(OnColorPickedListener listener, int initialColor) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_color_picker, null);
+        builder.setView(view);
+
+        View vPreview = view.findViewById(R.id.viewColorPreview);
+        SeekBar sbR = view.findViewById(R.id.sbRed);
+        SeekBar sbG = view.findViewById(R.id.sbGreen);
+        SeekBar sbB = view.findViewById(R.id.sbBlue);
+
+        // Ustawienie początkowych wartości
+        sbR.setProgress(Color.red(initialColor));
+        sbG.setProgress(Color.green(initialColor));
+        sbB.setProgress(Color.blue(initialColor));
+        vPreview.setBackgroundColor(initialColor);
+
+        SeekBar.OnSeekBarChangeListener changeListener = new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                int color = Color.rgb(sbR.getProgress(), sbG.getProgress(), sbB.getProgress());
+                vPreview.setBackgroundColor(color);
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        };
+
+        sbR.setOnSeekBarChangeListener(changeListener);
+        sbG.setOnSeekBarChangeListener(changeListener);
+        sbB.setOnSeekBarChangeListener(changeListener);
+
+        builder.setPositiveButton("Wybierz", (d, w) -> {
+            int finalColor = Color.rgb(sbR.getProgress(), sbG.getProgress(), sbB.getProgress());
+            listener.onColorPicked(finalColor);
+        });
+        builder.setNegativeButton("Anuluj", null);
+        builder.show();
+    }
+
+    interface OnColorPickedListener {
+        void onColorPicked(int color);
+    }
+
+    private class RectangleSelectDecorator implements DayViewDecorator {
+        private final int color;
+
+        public RectangleSelectDecorator(int color) {
+            this.color = color;
+        }
+
+        @Override
+        public boolean shouldDecorate(CalendarDay day) {
+            return day.equals(calendarView.getSelectedDate());
+        }
+
+        @Override
+        public void decorate(DayViewFacade view) {
+            view.addSpan(new RectangleSpan(color));
+        }
+    }
+
+    private static class RectangleSpan implements LineBackgroundSpan {
+        private final int color;
+
+        public RectangleSpan(int color) {
+            this.color = color;
+        }
+
+        @Override
+        public void drawBackground(Canvas canvas, Paint paint, int left, int right, int top, int edit, int bottom, CharSequence text, int start, int end, int lnum) {
+            int oldColor = paint.getColor();
+            paint.setColor(color);
+            // Draw a rounded rectangle for a modern look, or just canvas.drawRect for sharp edges
+            canvas.drawRoundRect(new RectF(left, top, right, bottom), 8, 8, paint);
+            paint.setColor(oldColor);
+        }
     }
 
     private void observeAllEntriesForDecorators() {
@@ -349,24 +524,12 @@ public class MainActivity extends AppCompatActivity {
         });
 
         view.findViewById(R.id.btnCustomColor).setOnClickListener(v -> {
-            final EditText input = new EditText(this);
-            input.setHint("#RRGGBB or #AARRGGBB");
-            new AlertDialog.Builder(this)
-                .setTitle("Enter Hex Color")
-                .setView(input)
-                .setPositiveButton("OK", (d, w) -> {
-                    try {
-                        int color = Color.parseColor(input.getText().toString());
-                        dialogSelectedColor = color;
-                        dialogOpacity = Color.alpha(color);
-                        updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity);
-                        rgColors.clearCheck();
-                    } catch (Exception e) {
-                        Toast.makeText(this, "Invalid color format", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+            pickColor(color -> {
+                dialogSelectedColor = color;
+                dialogOpacity = Color.alpha(color);
+                updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity);
+                rgColors.clearCheck();
+            }, dialogSelectedColor);
         });
 
         view.findViewById(R.id.btnSetAlarm).setOnClickListener(v -> {
