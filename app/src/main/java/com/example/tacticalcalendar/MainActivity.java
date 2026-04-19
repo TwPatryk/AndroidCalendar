@@ -138,6 +138,9 @@ public class MainActivity extends AppCompatActivity {
             for (java.util.Map.Entry<CalendarDay, java.util.List<Integer>> entry : dateColors.entrySet()) {
                 calendarView.addDecorator(new EventDecorator(entry.getValue(), entry.getKey()));
             }
+            
+            // Force refresh decorators
+            calendarView.invalidateDecorators();
         });
     }
 
@@ -157,10 +160,9 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void decorate(DayViewFacade view) {
-            // MaterialCalendarView typically supports one dot via DotSpan
-            // For multiple colors, we'd need a custom Span, but let's start with the first color
+            // Increased dot radius from 8 to 12 for better visibility
             if (!colors.isEmpty()) {
-                view.addSpan(new DotSpan(8, colors.get(0)));
+                view.addSpan(new DotSpan(12, colors.get(0)));
             }
         }
     }
