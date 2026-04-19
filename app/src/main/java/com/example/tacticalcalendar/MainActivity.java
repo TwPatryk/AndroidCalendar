@@ -183,6 +183,8 @@ public class MainActivity extends AppCompatActivity {
         showEntryDialog(entry);
     }
 
+    private int dialogSelectedColor = Color.WHITE;
+
     private void showEntryDialog(CalendarEntry entryToEdit) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_add_entry, null);
@@ -192,46 +194,89 @@ public class MainActivity extends AppCompatActivity {
         EditText etDescription = view.findViewById(R.id.etDescription);
         EditText etTags = view.findViewById(R.id.etTags);
         RadioGroup rgColors = view.findViewById(R.id.rgColors);
+        View viewSelectedColor = view.findViewById(R.id.viewSelectedColor);
+        viewSelectedColor.setVisibility(View.VISIBLE);
 
         if (entryToEdit != null) {
             etTitle.setText(entryToEdit.title);
             etDescription.setText(entryToEdit.description);
             etTags.setText(entryToEdit.tags);
             alarmTimeTemp = entryToEdit.alarmTime;
+            dialogSelectedColor = entryToEdit.color;
         } else {
             alarmTimeTemp = 0;
+            dialogSelectedColor = Color.WHITE;
         }
+        viewSelectedColor.setBackgroundColor(dialogSelectedColor);
+
+        rgColors.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.rbRed) dialogSelectedColor = Color.parseColor("#FFCDD2");
+            else if (checkedId == R.id.rbBlue) dialogSelectedColor = Color.parseColor("#BBDEFB");
+            else if (checkedId == R.id.rbGreen) dialogSelectedColor = Color.parseColor("#C8E6C9");
+            else if (checkedId == R.id.rbYellow) dialogSelectedColor = Color.parseColor("#FFF9C4");
+            viewSelectedColor.setBackgroundColor(dialogSelectedColor);
+        });
+
+        view.findViewById(R.id.btnCustomColor).setOnClickListener(v -> {
+            // Simple Custom Color Picker (Input Hex or predefined list)
+            final EditText input = new EditText(this);
+            input.setHint("#RRGGBB");
+            new AlertDialog.Builder(this)
+                .setTitle("Enter Hex Color")
+                .setView(input)
+                .setPositiveButton("OK", (d, w) -> {
+                    try {
+                        dialogSelectedColor = Color.parseColor(input.getText().toString());
+                        viewSelectedColor.setBackgroundColor(dialogSelectedColor);
+                        rgColors.clearCheck();
+                    } catch (Exception e) {
+                        Toast.makeText(this, "Invalid color format", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+        });
 
         view.findViewById(R.id.btnSetAlarm).setOnClickListener(v -> {
             Calendar currentTime = Calendar.getInstance();
-            new TimePickerDialog(this, (view1, hourOfDay, minute) -> {
+            int hour = currentTime.get(Calendar.HOUR_OF_DAY);
+            int minute = currentTime.get(Calendar.MINUTE);
+
+            // Ustawiamy domyślnie aktualny czas zaraz po kliknięciu
+            Calendar defaultAlarm = Calendar.getInstance();
+            defaultAlarm.setTimeInMillis(selectedDate);
+            defaultAlarm.set(Calendar.HOUR_OF_DAY, hour);
+            defaultAlarm.set(Calendar.MINUTE, minute);
+            alarmTimeTemp = defaultAlarm.getTimeInMillis();
+            
+            Toast.makeText(this, "Default alarm set to current time", Toast.LENGTH_SHORT).show();
+
+            new TimePickerDialog(this, (view1, hourOfDay, minute1) -> {
                 Calendar alarmCal = Calendar.getInstance();
                 alarmCal.setTimeInMillis(selectedDate);
                 alarmCal.set(Calendar.HOUR_OF_DAY, hourOfDay);
-                alarmCal.set(Calendar.MINUTE, minute);
+                alarmCal.set(Calendar.MINUTE, minute1);
                 alarmTimeTemp = alarmCal.getTimeInMillis();
-                Toast.makeText(this, "Alarm set", Toast.LENGTH_SHORT).show();
-            }, currentTime.get(Calendar.HOUR_OF_DAY), currentTime.get(Calendar.SECOND), true).show();
+                Toast.makeText(this, "Alarm time updated", Toast.LENGTH_SHORT).show();
+            }, hour, minute, true).show();
+        });
+
+        view.findViewById(R.id.btnRemoveAlarm).setOnClickListener(v -> {
+            alarmTimeTemp = 0;
+            Toast.makeText(this, "Alarm removed", Toast.LENGTH_SHORT).show();
         });
 
         builder.setPositiveButton("Save", (dialog, which) -> {
             String title = etTitle.getText().toString();
             String desc = etDescription.getText().toString();
             String tags = etTags.getText().toString();
-            
-            int color = Color.WHITE;
-            int checkedId = rgColors.getCheckedRadioButtonId();
-            if (checkedId == R.id.rbRed) color = Color.parseColor("#FFCDD2");
-            else if (checkedId == R.id.rbBlue) color = Color.parseColor("#BBDEFB");
-            else if (checkedId == R.id.rbGreen) color = Color.parseColor("#C8E6C9");
-            else if (checkedId == R.id.rbYellow) color = Color.parseColor("#FFF9C4");
 
             CalendarEntry entry = entryToEdit != null ? entryToEdit : new CalendarEntry();
             entry.title = title;
             entry.description = desc;
             entry.tags = tags;
             entry.date = selectedDate;
-            entry.color = color;
+            entry.color = dialogSelectedColor;
             entry.alarmTime = alarmTimeTemp;
             entry.hasAlarm = alarmTimeTemp > 0;
 
@@ -240,10 +285,14 @@ public class MainActivity extends AppCompatActivity {
                 if (entryToEdit != null) {
                     calendarDao.update(entry);
                     id = entry.id;
+                    // Cancel existing alarm if removed
+                    if (!entry.hasAlarm) {
+                        cancelAlarm((int)id);
+                    }
                 } else {
                     id = calendarDao.insert(entry);
                 }
-                
+
                 if (entry.hasAlarm) {
                     scheduleAlarm((int)id, entry.title, entry.alarmTime);
                 }
@@ -258,6 +307,15 @@ public class MainActivity extends AppCompatActivity {
         }
 
         builder.show();
+    }
+
+    private void cancelAlarm(int entryId) {
+        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        Intent intent = new Intent(this, AlarmReceiver.class);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, entryId, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        if (alarmManager != null) {
+            alarmManager.cancel(pendingIntent);
+        }
     }
 
     private void scheduleAlarm(int entryId, String title, long timeInMillis) {

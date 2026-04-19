@@ -53,27 +53,61 @@
 
         <HorizontalScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:padding="4dp">
             <RadioGroup
                 android:id="@+id/rgColors"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
-                <!-- Color radio buttons will be added programmatically or predefined -->
-                <RadioButton android:id="@+id/rbRed" android:layout_width="48dp" android:layout_height="48dp" android:background="#FFCDD2" android:button="@null"/>
-                <RadioButton android:id="@+id/rbBlue" android:layout_width="48dp" android:layout_height="48dp" android:background="#BBDEFB" android:button="@null" android:layout_marginStart="8dp"/>
-                <RadioButton android:id="@+id/rbGreen" android:layout_width="48dp" android:layout_height="48dp" android:background="#C8E6C9" android:button="@null" android:layout_marginStart="8dp"/>
-                <RadioButton android:id="@+id/rbYellow" android:layout_width="48dp" android:layout_height="48dp" android:background="#FFF9C4" android:button="@null" android:layout_marginStart="8dp"/>
+                <!-- Color radio buttons with better styling -->
+                <RadioButton android:id="@+id/rbRed" android:layout_width="48dp" android:layout_height="48dp" android:background="@android:color/holo_red_light" android:button="@android:drawable/btn_radio" android:layout_margin="4dp"/>
+                <RadioButton android:id="@+id/rbBlue" android:layout_width="48dp" android:layout_height="48dp" android:background="@android:color/holo_blue_light" android:button="@android:drawable/btn_radio" android:layout_margin="4dp"/>
+                <RadioButton android:id="@+id/rbGreen" android:layout_width="48dp" android:layout_height="48dp" android:background="@android:color/holo_green_light" android:button="@android:drawable/btn_radio" android:layout_margin="4dp"/>
+                <RadioButton android:id="@+id/rbYellow" android:layout_width="48dp" android:layout_height="48dp" android:background="@android:color/holo_orange_light" android:button="@android:drawable/btn_radio" android:layout_margin="4dp"/>
             </RadioGroup>
         </HorizontalScrollView>
 
         <Button
-            android:id="@+id/btnSetAlarm"
+            android:id="@+id/btnCustomColor"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Set Alarm"
-            android:layout_marginTop="16dp"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+            android:text="Choose Custom Color"
+            android:layout_marginTop="8dp"
+            style="@style/Widget.MaterialComponents.Button.TextButton"/>
+
+        <View
+            android:id="@+id/viewSelectedColor"
+            android:layout_width="match_parent"
+            android:layout_height="24dp"
+            android:layout_marginTop="4dp"
+            android:background="#FFFFFF"
+            android:visibility="gone"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp">
+
+            <Button
+                android:id="@+id/btnSetAlarm"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Set Alarm"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+            <Button
+                android:id="@+id/btnRemoveAlarm"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Remove Alarm"
+                android:layout_marginStart="8dp"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:textColor="@android:color/holo_red_dark"/>
+        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>
