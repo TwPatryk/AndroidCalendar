@@ -56,6 +56,10 @@ import android.text.style.LineBackgroundSpan;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 
+import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
+
 public class MainActivity extends AppCompatActivity {
     private MaterialCalendarView calendarView;
     private static final int PERMISSION_REQUEST_CODE = 123;
@@ -441,7 +445,24 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-        builder.show();
+        AlertDialog dialog = builder.create();
+        
+        // Zamykanie klawiatury po kliknięciu "Done" w ostatnim polu (Tags)
+        etTags.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+                return true;
+            }
+            return false;
+        });
+
+        // To sprawi, że dialog "podskoczy" nad klawiaturę
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
+        
+        dialog.show();
     }
 
     private void updateColorPreview(View preview, TextView label, SeekBar seekBar) {
