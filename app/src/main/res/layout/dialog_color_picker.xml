@@ -59,4 +59,17 @@
         android:max="255"
         android:layout_marginBottom="12dp"/>
 
+    <!-- Alpha (Opacity) -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Przezroczystość (Opacity)"/>
+    <SeekBar
+        android:id="@+id/sbAlpha"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="255"
+        android:progress="255"
+        android:layout_marginBottom="12dp"/>
+
 </LinearLayout>

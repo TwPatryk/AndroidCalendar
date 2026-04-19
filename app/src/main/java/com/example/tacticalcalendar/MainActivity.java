@@ -237,7 +237,7 @@ public class MainActivity extends AppCompatActivity {
         }, colorFab));
 
         view.findViewById(R.id.btnPickSelectionColor).setOnClickListener(v -> pickColor(c -> {
-            colorSelection = Color.argb(100, Color.red(c), Color.green(c), Color.blue(c));
+            colorSelection = c;
             vSel.setBackgroundColor(colorSelection);
         }, colorSelection));
 
@@ -268,17 +268,19 @@ public class MainActivity extends AppCompatActivity {
         SeekBar sbR = view.findViewById(R.id.sbRed);
         SeekBar sbG = view.findViewById(R.id.sbGreen);
         SeekBar sbB = view.findViewById(R.id.sbBlue);
+        SeekBar sbA = view.findViewById(R.id.sbAlpha);
 
         // Ustawienie początkowych wartości
         sbR.setProgress(Color.red(initialColor));
         sbG.setProgress(Color.green(initialColor));
         sbB.setProgress(Color.blue(initialColor));
+        sbA.setProgress(Color.alpha(initialColor));
         vPreview.setBackgroundColor(initialColor);
 
         SeekBar.OnSeekBarChangeListener changeListener = new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                int color = Color.rgb(sbR.getProgress(), sbG.getProgress(), sbB.getProgress());
+                int color = Color.argb(sbA.getProgress(), sbR.getProgress(), sbG.getProgress(), sbB.getProgress());
                 vPreview.setBackgroundColor(color);
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
@@ -288,9 +290,10 @@ public class MainActivity extends AppCompatActivity {
         sbR.setOnSeekBarChangeListener(changeListener);
         sbG.setOnSeekBarChangeListener(changeListener);
         sbB.setOnSeekBarChangeListener(changeListener);
+        sbA.setOnSeekBarChangeListener(changeListener);
 
         builder.setPositiveButton("Wybierz", (d, w) -> {
-            int finalColor = Color.rgb(sbR.getProgress(), sbG.getProgress(), sbB.getProgress());
+            int finalColor = Color.argb(sbA.getProgress(), sbR.getProgress(), sbG.getProgress(), sbB.getProgress());
             listener.onColorPicked(finalColor);
         });
         builder.setNegativeButton("Anuluj", null);
