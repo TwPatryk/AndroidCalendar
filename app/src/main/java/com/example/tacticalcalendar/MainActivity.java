@@ -176,6 +176,8 @@ public class MainActivity extends AppCompatActivity {
         observeAllTags();
         observeAllEntriesForDecorators();
         
+        handleIntent(getIntent());
+        
         findViewById(R.id.chipShowAll).setOnClickListener(v -> {
             activeTags.clear();
             activeTags.addAll(allAvailableTags);
@@ -183,6 +185,33 @@ public class MainActivity extends AppCompatActivity {
             applyFilters();
             observeAllEntriesForDecorators(); // Odśwież kropki
         });
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIntent(intent);
+    }
+
+    private void handleIntent(Intent intent) {
+        if (intent != null && intent.getBooleanExtra("ACTION_ADD_ENTRY", false)) {
+            Calendar cal = Calendar.getInstance();
+            cal.add(Calendar.DAY_OF_YEAR, 1); // Ustaw jutro
+            selectedDate = normalizeDate(cal.getTimeInMillis());
+            
+            // Zaktualizuj widok kalendarza
+            CalendarDay tomorrow = CalendarDay.from(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH));
+            calendarView.setSelectedDate(tomorrow);
+            calendarView.setCurrentDate(tomorrow);
+            
+            loadEntriesForSelectedDate();
+
+            // Otwórz dialog z domyślnym tagiem
+            CalendarEntry entry = new CalendarEntry();
+            entry.tags = "niepilne";
+            showEntryDialog(entry);
+        }
     }
 
     private void loadUserColors() {
