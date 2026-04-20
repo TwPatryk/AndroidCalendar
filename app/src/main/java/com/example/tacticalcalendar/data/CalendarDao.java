@@ -37,4 +37,7 @@ public interface CalendarDao {
     
     @Query("SELECT DISTINCT date FROM calendar_entries")
     LiveData<List<Long>> getDatesWithEntries();
+
+    @Query("DELETE FROM calendar_entries")
+    void deleteAll();
 }

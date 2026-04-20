@@ -825,6 +825,7 @@ public class MainActivity extends AppCompatActivity {
 
                 if (backup != null) {
                     if (backup.entries != null) {
+                        calendarDao.deleteAll(); // Wyczyść stare dane przed importem
                         for (CalendarEntry entry : backup.entries) {
                             entry.id = 0; // Ensure new insertion
                             calendarDao.insert(entry);
