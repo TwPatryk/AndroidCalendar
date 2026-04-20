@@ -376,14 +376,16 @@ public class MainActivity extends AppCompatActivity {
             java.util.Map<CalendarDay, java.util.List<Integer>> dateColors = new java.util.HashMap<>();
             for (CalendarEntry entry : entries) {
                 // Filtrowanie wpisów dla dekoratorów (kropek)
-                boolean matchesFilter = false;
-                if (entry.tags == null || entry.tags.isEmpty()) {
-                    matchesFilter = activeTags.isEmpty() || activeTags.size() == allAvailableTags.size(); 
-                } else {
-                    for (String t : entry.tags.split(",")) {
-                        if (activeTags.contains(t.trim())) {
-                            matchesFilter = true;
-                            break;
+                boolean matchesFilter = activeTags.isEmpty();
+                if (!matchesFilter) {
+                    if (entry.tags == null || entry.tags.isEmpty()) {
+                        matchesFilter = activeTags.size() == allAvailableTags.size(); 
+                    } else {
+                        for (String t : entry.tags.split(",")) {
+                            if (activeTags.contains(t.trim())) {
+                                matchesFilter = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -528,7 +530,12 @@ public class MainActivity extends AppCompatActivity {
             List<CalendarEntry> filtered = new ArrayList<>();
             for (CalendarEntry entry : currentDayEntries) {
                 boolean match = false;
-                if (entry.tags != null) {
+                if (entry.tags == null || entry.tags.trim().isEmpty()) {
+                    // Wpis bez tagów jest widoczny tylko jeśli nie filtrujemy po konkretnych tagach
+                    // Ale w Twoim przypadku, domyślnie ukrywamy 'niepilne'.
+                    // Aby wpis bez tagów był widoczny, traktujemy go jako pasujący.
+                    match = true; 
+                } else {
                     for (String t : entry.tags.split(",")) {
                         if (activeTags.contains(t.trim())) {
                             match = true;
@@ -541,7 +548,7 @@ public class MainActivity extends AppCompatActivity {
             adapter.setEntries(filtered);
         }
     }
-    
+
     private void updateFilters() {
         for (int i = 0; i < tagChipGroup.getChildCount(); i++) {
             View v = tagChipGroup.getChildAt(i);
@@ -678,6 +685,30 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Alarm removed", Toast.LENGTH_SHORT).show();
         });
 
+        view.findViewById(R.id.btnMoveOneDay).setOnClickListener(v -> {
+            Calendar cal = Calendar.getInstance();
+            cal.setTimeInMillis(selectedDate);
+            cal.add(Calendar.DAY_OF_YEAR, 1);
+            selectedDate = cal.getTimeInMillis();
+            calendarView.setSelectedDate(CalendarDay.from(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH)));
+            calendarView.setCurrentDate(CalendarDay.from(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH)));
+            loadEntriesForSelectedDate();
+            Toast.makeText(this, "Przeniesiono o 1 dzień", Toast.LENGTH_SHORT).show();
+        });
+
+        view.findViewById(R.id.btnMoveToSunday).setOnClickListener(v -> {
+            Calendar cal = Calendar.getInstance();
+            cal.setTimeInMillis(selectedDate);
+            while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY) {
+                cal.add(Calendar.DAY_OF_YEAR, 1);
+            }
+            selectedDate = cal.getTimeInMillis();
+            calendarView.setSelectedDate(CalendarDay.from(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH)));
+            calendarView.setCurrentDate(CalendarDay.from(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH)));
+            loadEntriesForSelectedDate();
+            Toast.makeText(this, "Przeniesiono do niedzieli", Toast.LENGTH_SHORT).show();
+        });
+
         builder.setPositiveButton("Save", (dialog, which) -> {
             // Hide keyboard
             View currentFocus = ((AlertDialog)dialog).getCurrentFocus();
@@ -715,6 +746,11 @@ public class MainActivity extends AppCompatActivity {
                 if (entry.hasAlarm) {
                     scheduleAlarm((int)id, entry.title, entry.alarmTime);
                 }
+                
+                runOnUiThread(() -> {
+                    loadEntriesForSelectedDate();
+                    Toast.makeText(this, "Entry saved", Toast.LENGTH_SHORT).show();
+                });
             });
         });
 
