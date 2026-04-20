@@ -46,6 +46,7 @@ dependencies {
     implementation(libs.lifecycle.livedata)
     implementation(libs.material.calendarview)
     implementation(libs.threetenabp)
+    implementation(libs.gson)
     annotationProcessor(libs.room.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)

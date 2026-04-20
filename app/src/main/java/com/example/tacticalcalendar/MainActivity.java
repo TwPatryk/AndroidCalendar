@@ -7,7 +7,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.app.AlertDialog;
 import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -18,10 +17,8 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
-import androidx.lifecycle.LiveData;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -36,8 +33,6 @@ import com.prolificinteractive.materialcalendarview.CalendarDay;
 import com.prolificinteractive.materialcalendarview.DayViewDecorator;
 import com.prolificinteractive.materialcalendarview.DayViewFacade;
 import com.prolificinteractive.materialcalendarview.MaterialCalendarView;
-import com.prolificinteractive.materialcalendarview.OnDateSelectedListener;
-import com.prolificinteractive.materialcalendarview.spans.DotSpan;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -61,13 +56,22 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 
 import android.content.SharedPreferences;
-import android.graphics.RectF;
 import android.view.Menu;
 import android.view.MenuItem;
 
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.core.view.GravityCompat;
 import androidx.appcompat.app.ActionBarDrawerToggle;
+
+import com.google.gson.Gson;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
+import android.net.Uri;
 
 public class MainActivity extends AppCompatActivity {
     private MaterialCalendarView calendarView;
@@ -92,6 +96,28 @@ public class MainActivity extends AppCompatActivity {
     private int colorSelection = Color.parseColor("#440000FF");
     private int colorToolbar = Color.parseColor("#6200EE");
     private SharedPreferences prefs;
+
+    private static class BackupData {
+        List<CalendarEntry> entries;
+        int colorBackground;
+        int colorFab;
+        int colorSelection;
+        int colorToolbar;
+    }
+
+    private final ActivityResultLauncher<String> exportLauncher = registerForActivityResult(
+            new ActivityResultContracts.CreateDocument("application/json"),
+            uri -> {
+                if (uri != null) performExport(uri);
+            }
+    );
+
+    private final ActivityResultLauncher<String[]> importLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) performImport(uri);
+            }
+    );
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -153,8 +179,6 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.chipShowAll).setOnClickListener(v -> {
             activeTags.clear();
             activeTags.addAll(allAvailableTags);
-            // Wyjątek: niepilne wciąż ukryte przy show all? 
-            // Zwykle show all pokazuje wszystko, więc dodajemy też niepilne.
             updateFilters();
             applyFilters();
             observeAllEntriesForDecorators(); // Odśwież kropki
@@ -265,6 +289,14 @@ public class MainActivity extends AppCompatActivity {
             colorToolbar = c;
             vTool.setBackgroundColor(c);
         }, colorToolbar));
+
+        view.findViewById(R.id.btnExport).setOnClickListener(v -> {
+            exportLauncher.launch("tactical_calendar_backup.json");
+        });
+
+        view.findViewById(R.id.btnImport).setOnClickListener(v -> {
+            importLauncher.launch(new String[]{"application/json", "application/octet-stream"});
+        });
 
         builder.setPositiveButton("Save", (d, w) -> {
             prefs.edit()
@@ -511,8 +543,11 @@ public class MainActivity extends AppCompatActivity {
     }
     
     private void updateFilters() {
-        for (int i = 1; i < tagChipGroup.getChildCount(); i++) {
-            ((Chip)tagChipGroup.getChildAt(i)).setChecked(false);
+        for (int i = 0; i < tagChipGroup.getChildCount(); i++) {
+            View v = tagChipGroup.getChildAt(i);
+            if (v instanceof Chip) {
+                ((Chip)v).setChecked(activeTags.contains(((Chip)v).getText().toString()));
+            }
         }
         applyFilters();
     }
@@ -719,6 +754,64 @@ public class MainActivity extends AppCompatActivity {
         int satPercent = (int) (dialogSaturation * 100);
         satLabel.setText("Saturation: " + satPercent + "%");
         satSeekBar.setProgress(satPercent);
+    }
+
+    private void performExport(Uri uri) {
+        executorService.execute(() -> {
+            try {
+                BackupData backup = new BackupData();
+                backup.entries = calendarDao.getAllEntriesSync();
+                backup.colorBackground = colorBackground;
+                backup.colorFab = colorFab;
+                backup.colorSelection = colorSelection;
+                backup.colorToolbar = colorToolbar;
+
+                String json = new Gson().toJson(backup);
+                try (OutputStream os = getContentResolver().openOutputStream(uri);
+                     OutputStreamWriter writer = new OutputStreamWriter(os, StandardCharsets.UTF_8)) {
+                    writer.write(json);
+                }
+                runOnUiThread(() -> Toast.makeText(this, "Data exported successfully", Toast.LENGTH_SHORT).show());
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(this, "Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void performImport(Uri uri) {
+        executorService.execute(() -> {
+            try {
+                BackupData backup;
+                try (InputStream is = getContentResolver().openInputStream(uri);
+                     InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+                    backup = new Gson().fromJson(reader, BackupData.class);
+                }
+
+                if (backup != null) {
+                    if (backup.entries != null) {
+                        for (CalendarEntry entry : backup.entries) {
+                            entry.id = 0; // Ensure new insertion
+                            calendarDao.insert(entry);
+                        }
+                    }
+                    
+                    SharedPreferences.Editor editor = prefs.edit();
+                    editor.putInt("color_bg", backup.colorBackground);
+                    editor.putInt("color_fab", backup.colorFab);
+                    editor.putInt("color_selection", backup.colorSelection);
+                    editor.putInt("color_toolbar", backup.colorToolbar);
+                    editor.apply();
+
+                    runOnUiThread(() -> {
+                        loadUserColors();
+                        applyUiColors();
+                        Toast.makeText(this, "Data imported successfully", Toast.LENGTH_SHORT).show();
+                    });
+                }
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(this, "Import failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        });
     }
 
     private void cancelAlarm(int entryId) {

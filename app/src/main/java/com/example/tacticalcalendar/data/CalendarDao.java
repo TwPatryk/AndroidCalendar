@@ -25,6 +25,9 @@ public interface CalendarDao {
 
     @Query("SELECT * FROM calendar_entries ORDER BY date ASC")
     LiveData<List<CalendarEntry>> getAllEntries();
+
+    @Query("SELECT * FROM calendar_entries ORDER BY date ASC")
+    List<CalendarEntry> getAllEntriesSync();
     
     @Query("SELECT * FROM calendar_entries WHERE id = :id")
     CalendarEntry getEntryById(int id);
