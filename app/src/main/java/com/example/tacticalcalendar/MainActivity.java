@@ -194,23 +194,36 @@ public class MainActivity extends AppCompatActivity {
         handleIntent(intent);
     }
 
+    private long normalizeDate(long timestamp) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTimeInMillis(timestamp);
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        return cal.getTimeInMillis();
+    }
+
     private void handleIntent(Intent intent) {
-        if (intent != null && intent.getBooleanExtra("ACTION_ADD_ENTRY", false)) {
-            Calendar cal = Calendar.getInstance();
-            cal.add(Calendar.DAY_OF_YEAR, 1); // Ustaw jutro
-            selectedDate = normalizeDate(cal.getTimeInMillis());
+        if (intent != null && ("ACTION_ADD_ENTRY".equals(intent.getAction()) || intent.getBooleanExtra("ACTION_ADD_ENTRY", false))) {
+            intent.removeExtra("ACTION_ADD_ENTRY");
+            intent.setAction(null); // Clear action to prevent multiple triggers if activity is recreated
+
+            // WYMUSZAMY DOKŁADNĄ PÓŁNOC DZISIAJ
+            selectedDate = normalizeDate(System.currentTimeMillis());
             
-            // Zaktualizuj widok kalendarza
-            CalendarDay tomorrow = CalendarDay.from(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH));
-            calendarView.setSelectedDate(tomorrow);
-            calendarView.setCurrentDate(tomorrow);
+            CalendarDay today = CalendarDay.today();
+            calendarView.setSelectedDate(today);
+            calendarView.setCurrentDate(today);
             
             loadEntriesForSelectedDate();
 
-            // Otwórz dialog z domyślnym tagiem
-            CalendarEntry entry = new CalendarEntry();
-            entry.tags = "niepilne";
-            showEntryDialog(entry);
+            calendarView.postDelayed(() -> {
+                CalendarEntry entry = new CalendarEntry();
+                entry.date = selectedDate; // Set the correct date
+                entry.tags = "niepilne";
+                showEntryDialog(entry);
+            }, 200);
         }
     }
 
@@ -494,16 +507,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private long normalizeDate(long time) {
-        Calendar cal = Calendar.getInstance();
-        cal.setTimeInMillis(time);
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-        return cal.getTimeInMillis();
-    }
-
     private void loadEntriesForSelectedDate() {
         calendarDao.getEntriesForDate(selectedDate).observe(this, entries -> {
             currentDayEntries = entries;
@@ -514,6 +517,7 @@ public class MainActivity extends AppCompatActivity {
     private void observeAllTags() {
         calendarDao.getAllEntries().observe(this, entries -> {
             Set<String> allTags = new HashSet<>();
+            allTags.add("niepilne"); // Zawsze dodawaj tag "niepilne" do listy dostępnych
             for (CalendarEntry entry : entries) {
                 if (entry.tags != null && !entry.tags.isEmpty()) {
                     for (String t : entry.tags.split(",")) {
@@ -525,10 +529,15 @@ public class MainActivity extends AppCompatActivity {
             if (isFirstTagLoad) {
                 allAvailableTags = new HashSet<>(allTags);
                 activeTags = new HashSet<>(allTags);
-                activeTags.remove("niepilne"); // Domyślnie ukrywamy 'niepilne'
+                
+                // Domyślnie zawsze ukrywamy "niepilne"
+                activeTags.remove("niepilne");
+                
                 isFirstTagLoad = false;
                 applyFilters();
                 observeAllEntriesForDecorators();
+            } else {
+                allAvailableTags.addAll(allTags);
             }
             updateTagChips(allTags);
         });
@@ -553,29 +562,23 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void applyFilters() {
-        if (activeTags.isEmpty()) {
-            adapter.setEntries(currentDayEntries);
-        } else {
-            List<CalendarEntry> filtered = new ArrayList<>();
-            for (CalendarEntry entry : currentDayEntries) {
-                boolean match = false;
-                if (entry.tags == null || entry.tags.trim().isEmpty()) {
-                    // Wpis bez tagów jest widoczny tylko jeśli nie filtrujemy po konkretnych tagach
-                    // Ale w Twoim przypadku, domyślnie ukrywamy 'niepilne'.
-                    // Aby wpis bez tagów był widoczny, traktujemy go jako pasujący.
-                    match = true; 
-                } else {
-                    for (String t : entry.tags.split(",")) {
-                        if (activeTags.contains(t.trim())) {
-                            match = true;
-                            break;
-                        }
+        if (currentDayEntries == null) return;
+        
+        List<CalendarEntry> filtered = new ArrayList<>();
+        for (CalendarEntry entry : currentDayEntries) {
+            if (entry.tags == null || entry.tags.trim().isEmpty()) {
+                filtered.add(entry);
+            } else {
+                String[] entryTags = entry.tags.split(",");
+                for (String t : entryTags) {
+                    if (activeTags.contains(t.trim())) {
+                        filtered.add(entry);
+                        break;
                     }
                 }
-                if (match) filtered.add(entry);
             }
-            adapter.setEntries(filtered);
         }
+        adapter.setEntries(filtered);
     }
 
     private void updateFilters() {
@@ -615,17 +618,20 @@ public class MainActivity extends AppCompatActivity {
         SeekBar sbSaturation = view.findViewById(R.id.sbSaturation);
         TextView tvSaturationLabel = view.findViewById(R.id.tvSaturationLabel);
 
-        if (entryToEdit != null) {
+        if (entryToEdit != null && entryToEdit.id != 0) {
             etTitle.setText(entryToEdit.title);
             etDescription.setText(entryToEdit.description);
             etTags.setText(entryToEdit.tags);
             alarmTimeTemp = entryToEdit.alarmTime;
-            dialogSelectedColor = entryToEdit.color;
+            dialogSelectedColor = entryToEdit.color != 0 ? entryToEdit.color : Color.WHITE;
             dialogOpacity = Color.alpha(dialogSelectedColor);
             float[] hsv = new float[3];
             Color.colorToHSV(dialogSelectedColor, hsv);
             dialogSaturation = hsv[1];
         } else {
+            if (entryToEdit != null) {
+                etTags.setText(entryToEdit.tags);
+            }
             alarmTimeTemp = 0;
             dialogSelectedColor = Color.WHITE;
             dialogOpacity = 255;
@@ -754,14 +760,18 @@ public class MainActivity extends AppCompatActivity {
             entry.title = title;
             entry.description = desc;
             entry.tags = tags;
-            entry.date = selectedDate;
+            // entry.date is already set if entryToEdit != null, 
+            // but for new entries from widget/fab it should use selectedDate
+            if (entry.date == 0) {
+                entry.date = selectedDate;
+            }
             entry.color = dialogSelectedColor;
             entry.alarmTime = alarmTimeTemp;
             entry.hasAlarm = alarmTimeTemp > 0;
 
             executorService.execute(() -> {
                 long id;
-                if (entryToEdit != null) {
+                if (entryToEdit != null && entryToEdit.id != 0) {
                     calendarDao.update(entry);
                     id = entry.id;
                     // Cancel existing alarm if removed

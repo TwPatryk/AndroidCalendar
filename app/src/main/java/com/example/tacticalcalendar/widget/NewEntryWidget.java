@@ -16,7 +16,7 @@ public class NewEntryWidget extends AppWidgetProvider {
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
         for (int appWidgetId : appWidgetIds) {
             Intent intent = new Intent(context, MainActivity.class);
-            intent.putExtra("ACTION_ADD_ENTRY", true);
+            intent.setAction("ACTION_ADD_ENTRY");
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             
             PendingIntent pendingIntent = PendingIntent.getActivity(
