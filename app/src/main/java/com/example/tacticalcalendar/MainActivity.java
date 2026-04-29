@@ -6,11 +6,13 @@ import android.app.TimePickerDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.app.AlertDialog;
+import android.app.DatePickerDialog;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
@@ -34,10 +36,13 @@ import com.prolificinteractive.materialcalendarview.DayViewDecorator;
 import com.prolificinteractive.materialcalendarview.DayViewFacade;
 import com.prolificinteractive.materialcalendarview.MaterialCalendarView;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -209,18 +214,24 @@ public class MainActivity extends AppCompatActivity {
             intent.removeExtra("ACTION_ADD_ENTRY");
             intent.setAction(null); // Clear action to prevent multiple triggers if activity is recreated
 
-            // WYMUSZAMY DOKŁADNĄ PÓŁNOC DZISIAJ
-            selectedDate = normalizeDate(System.currentTimeMillis());
+            // WYMUSZAMY JUTRO (Dzień + 1)
+            Calendar cal = Calendar.getInstance();
+            cal.add(Calendar.DAY_OF_YEAR, 1);
+            cal.set(Calendar.HOUR_OF_DAY, 0);
+            cal.set(Calendar.MINUTE, 0);
+            cal.set(Calendar.SECOND, 0);
+            cal.set(Calendar.MILLISECOND, 0);
+            selectedDate = cal.getTimeInMillis();
             
-            CalendarDay today = CalendarDay.today();
-            calendarView.setSelectedDate(today);
-            calendarView.setCurrentDate(today);
+            CalendarDay tomorrow = CalendarDay.from(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH));
+            calendarView.setSelectedDate(tomorrow);
+            calendarView.setCurrentDate(tomorrow);
             
             loadEntriesForSelectedDate();
 
             calendarView.postDelayed(() -> {
                 CalendarEntry entry = new CalendarEntry();
-                entry.date = selectedDate; // Set the correct date
+                entry.date = selectedDate; // Set the correct date (tomorrow)
                 entry.tags = "niepilne";
                 showEntryDialog(entry);
             }, 200);
@@ -550,12 +561,24 @@ public class MainActivity extends AppCompatActivity {
             Chip chip = new Chip(this);
             chip.setText(tag);
             chip.setCheckable(true);
-            chip.setChecked(activeTags.contains(tag));
-            chip.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                if (isChecked) activeTags.add(tag);
+            boolean isChecked = activeTags.contains(tag);
+            chip.setChecked(isChecked);
+            
+            // Stylizacja dla lepszej widoczności zaznaczenia
+            if (isChecked) {
+                chip.setChipBackgroundColorResource(R.color.purple_200); // Or use colorFab
+                chip.setTextColor(Color.WHITE);
+            } else {
+                chip.setChipBackgroundColor(null); // Default
+                chip.setTextColor(Color.BLACK);
+            }
+
+            chip.setOnCheckedChangeListener((buttonView, checked) -> {
+                if (checked) activeTags.add(tag);
                 else activeTags.remove(tag);
                 applyFilters();
-                observeAllEntriesForDecorators(); // Ważne: odśwież kropki przy zmianie filtra
+                observeAllEntriesForDecorators();
+                updateTagChips(tags); // Refresh to apply styles
             });
             tagChipGroup.addView(chip);
         }
@@ -602,6 +625,7 @@ public class MainActivity extends AppCompatActivity {
     private int dialogSelectedColor = Color.WHITE;
     private int dialogOpacity = 255;
     private float dialogSaturation = 1.0f;
+    private long dialogEntryDate = 0;
 
     private void showEntryDialog(CalendarEntry entryToEdit) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -617,6 +641,9 @@ public class MainActivity extends AppCompatActivity {
         TextView tvOpacityLabel = view.findViewById(R.id.tvOpacityLabel);
         SeekBar sbSaturation = view.findViewById(R.id.sbSaturation);
         TextView tvSaturationLabel = view.findViewById(R.id.tvSaturationLabel);
+        
+        Button btnPickDate = view.findViewById(R.id.btnPickDate);
+        TextView tvCurrentDate = view.findViewById(R.id.tvCurrentDate);
 
         if (entryToEdit != null && entryToEdit.id != 0) {
             etTitle.setText(entryToEdit.title);
@@ -628,9 +655,13 @@ public class MainActivity extends AppCompatActivity {
             float[] hsv = new float[3];
             Color.colorToHSV(dialogSelectedColor, hsv);
             dialogSaturation = hsv[1];
+            dialogEntryDate = entryToEdit.date;
         } else {
             if (entryToEdit != null) {
                 etTags.setText(entryToEdit.tags);
+                dialogEntryDate = entryToEdit.date != 0 ? entryToEdit.date : selectedDate;
+            } else {
+                dialogEntryDate = selectedDate;
             }
             alarmTimeTemp = 0;
             dialogSelectedColor = Color.WHITE;
@@ -638,6 +669,21 @@ public class MainActivity extends AppCompatActivity {
             dialogSaturation = 1.0f;
         }
         
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        tvCurrentDate.setText(sdf.format(new Date(dialogEntryDate)));
+
+        btnPickDate.setOnClickListener(v -> {
+            Calendar cal = Calendar.getInstance();
+            cal.setTimeInMillis(dialogEntryDate);
+            new DatePickerDialog(this, (view1, year, month, dayOfMonth) -> {
+                Calendar newCal = Calendar.getInstance();
+                newCal.set(year, month, dayOfMonth, 0, 0, 0);
+                newCal.set(Calendar.MILLISECOND, 0);
+                dialogEntryDate = newCal.getTimeInMillis();
+                tvCurrentDate.setText(sdf.format(new Date(dialogEntryDate)));
+            }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+        });
+
         updateColorPreview(viewSelectedColor, tvOpacityLabel, sbOpacity, tvSaturationLabel, sbSaturation);
 
         rgColors.setOnCheckedChangeListener((group, checkedId) -> {
@@ -696,9 +742,9 @@ public class MainActivity extends AppCompatActivity {
             int hour = currentTime.get(Calendar.HOUR_OF_DAY);
             int minute = currentTime.get(Calendar.MINUTE);
 
-            // Ustawiamy domyślnie aktualny czas zaraz po kliknięciu
+            // Ustawiamy domyślnie aktualny czas na wybranym dniu
             Calendar defaultAlarm = Calendar.getInstance();
-            defaultAlarm.setTimeInMillis(selectedDate);
+            defaultAlarm.setTimeInMillis(dialogEntryDate);
             defaultAlarm.set(Calendar.HOUR_OF_DAY, hour);
             defaultAlarm.set(Calendar.MINUTE, minute);
             alarmTimeTemp = defaultAlarm.getTimeInMillis();
@@ -707,7 +753,7 @@ public class MainActivity extends AppCompatActivity {
 
             new TimePickerDialog(this, (view1, hourOfDay, minute1) -> {
                 Calendar alarmCal = Calendar.getInstance();
-                alarmCal.setTimeInMillis(selectedDate);
+                alarmCal.setTimeInMillis(dialogEntryDate);
                 alarmCal.set(Calendar.HOUR_OF_DAY, hourOfDay);
                 alarmCal.set(Calendar.MINUTE, minute1);
                 alarmTimeTemp = alarmCal.getTimeInMillis();
@@ -722,25 +768,25 @@ public class MainActivity extends AppCompatActivity {
 
         view.findViewById(R.id.btnMoveOneDay).setOnClickListener(v -> {
             Calendar cal = Calendar.getInstance();
-            cal.setTimeInMillis(selectedDate);
+            cal.setTimeInMillis(dialogEntryDate);
             cal.add(Calendar.DAY_OF_YEAR, 1);
-            selectedDate = cal.getTimeInMillis();
-            calendarView.setSelectedDate(CalendarDay.from(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH)));
-            calendarView.setCurrentDate(CalendarDay.from(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH)));
-            loadEntriesForSelectedDate();
+            dialogEntryDate = cal.getTimeInMillis();
+            tvCurrentDate.setText(sdf.format(new Date(dialogEntryDate)));
             Toast.makeText(this, "Przeniesiono o 1 dzień", Toast.LENGTH_SHORT).show();
         });
 
         view.findViewById(R.id.btnMoveToSunday).setOnClickListener(v -> {
             Calendar cal = Calendar.getInstance();
-            cal.setTimeInMillis(selectedDate);
+            cal.setTimeInMillis(dialogEntryDate);
+            // Jeśli to już niedziela, przejdź do następnej
+            if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) {
+                cal.add(Calendar.DAY_OF_YEAR, 1);
+            }
             while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY) {
                 cal.add(Calendar.DAY_OF_YEAR, 1);
             }
-            selectedDate = cal.getTimeInMillis();
-            calendarView.setSelectedDate(CalendarDay.from(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH)));
-            calendarView.setCurrentDate(CalendarDay.from(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH)));
-            loadEntriesForSelectedDate();
+            dialogEntryDate = cal.getTimeInMillis();
+            tvCurrentDate.setText(sdf.format(new Date(dialogEntryDate)));
             Toast.makeText(this, "Przeniesiono do niedzieli", Toast.LENGTH_SHORT).show();
         });
 
@@ -760,11 +806,10 @@ public class MainActivity extends AppCompatActivity {
             entry.title = title;
             entry.description = desc;
             entry.tags = tags;
-            // entry.date is already set if entryToEdit != null, 
-            // but for new entries from widget/fab it should use selectedDate
-            if (entry.date == 0) {
-                entry.date = selectedDate;
-            }
+            
+            // Use the date selected in the dialog
+            entry.date = dialogEntryDate;
+
             entry.color = dialogSelectedColor;
             entry.alarmTime = alarmTimeTemp;
             entry.hasAlarm = alarmTimeTemp > 0;
