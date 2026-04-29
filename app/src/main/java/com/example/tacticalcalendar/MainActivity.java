@@ -775,19 +775,42 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Przeniesiono o 1 dzień", Toast.LENGTH_SHORT).show();
         });
 
+        view.findViewById(R.id.btnMoveSevenDays).setOnClickListener(v -> {
+            Calendar cal = Calendar.getInstance();
+            cal.setTimeInMillis(dialogEntryDate);
+            cal.add(Calendar.DAY_OF_YEAR, 7);
+            dialogEntryDate = cal.getTimeInMillis();
+            tvCurrentDate.setText(sdf.format(new Date(dialogEntryDate)));
+            Toast.makeText(this, "Przeniesiono o 7 dni", Toast.LENGTH_SHORT).show();
+        });
+
+        view.findViewById(R.id.btnMoveOneMonth).setOnClickListener(v -> {
+            Calendar cal = Calendar.getInstance();
+            cal.setTimeInMillis(dialogEntryDate);
+            cal.add(Calendar.MONTH, 1);
+            dialogEntryDate = cal.getTimeInMillis();
+            tvCurrentDate.setText(sdf.format(new Date(dialogEntryDate)));
+            Toast.makeText(this, "Przeniesiono o 1 miesiąc", Toast.LENGTH_SHORT).show();
+        });
+
         view.findViewById(R.id.btnMoveToSunday).setOnClickListener(v -> {
             Calendar cal = Calendar.getInstance();
             cal.setTimeInMillis(dialogEntryDate);
-            // Jeśli to już niedziela, przejdź do następnej
-            if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) {
+            
+            // Zawsze przechodzimy do kolejnej niedzieli (minimum +1 dzień)
+            do {
                 cal.add(Calendar.DAY_OF_YEAR, 1);
-            }
-            while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY) {
-                cal.add(Calendar.DAY_OF_YEAR, 1);
-            }
+            } while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY);
+
+            // Wyzeruj czas dla spójności
+            cal.set(Calendar.HOUR_OF_DAY, 0);
+            cal.set(Calendar.MINUTE, 0);
+            cal.set(Calendar.SECOND, 0);
+            cal.set(Calendar.MILLISECOND, 0);
+
             dialogEntryDate = cal.getTimeInMillis();
             tvCurrentDate.setText(sdf.format(new Date(dialogEntryDate)));
-            Toast.makeText(this, "Przeniesiono do niedzieli", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Przeniesiono do najbliższej niedzieli", Toast.LENGTH_SHORT).show();
         });
 
         builder.setPositiveButton("Save", (dialog, which) -> {

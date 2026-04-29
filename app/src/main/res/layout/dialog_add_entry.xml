@@ -155,16 +155,34 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="+1 Dzień"
+                android:text="+1 D"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+            <Button
+                android:id="@+id/btnMoveSevenDays"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="+7 D"
+                android:layout_marginStart="4dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+            <Button
+                android:id="@+id/btnMoveOneMonth"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="+1 M"
+                android:layout_marginStart="4dp"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
             <Button
                 android:id="@+id/btnMoveToSunday"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Do Niedzieli"
-                android:layout_marginStart="8dp"
+                android:layout_weight="1.2"
+                android:text="→ Nie"
+                android:layout_marginStart="4dp"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
         </LinearLayout>
 
